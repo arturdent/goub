@@ -1,10 +1,5 @@
 package goub
 
-var (
-	VideoTypes      = [...]string{"flw", "mp4"}
-	VideoDementions = [...]string{"big", "med", "small"}
-)
-
 type CoubService struct {
 	client *Client
 }
