@@ -1,7 +1,11 @@
 package goub
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
+	"net/url"
 
 	"golang.org/x/oauth2"
 )
@@ -18,6 +22,7 @@ const (
 type Client struct {
 	Client    *http.Client
 	UserAgent string
+	BaseURL   *url.URL
 }
 
 func MakeConfig(appId string, secret string, callbackURL string) *oauth2.Config {
@@ -32,47 +37,46 @@ func MakeConfig(appId string, secret string, callbackURL string) *oauth2.Config 
 	}
 }
 
-func NewClient(config *oauth2.Config, code string) (*Client, error) {
-	token, err := config.Exchange(oauth2.NoContext, code)
-	if err != nil {
-		return nil, err
-	}
+func NewClient(config *oauth2.Config, token *oauth2.Token) (*Client, error) {
+	baseURL, _ := url.Parse(defaultBaseURL)
 
 	client := &Client{
 		Client:    config.Client(oauth2.NoContext, token),
 		UserAgent: userAgent,
+		BaseURL:   baseURL,
 	}
-
 	return client, nil
 }
 
-// func
+func (client *Client) NewRequest(method, urlString string, body interface{}) (*http.Request, error) {
+	rel, err := url.Parse(urlString)
+	if err != nil {
+		return nil, err
+	}
+	url := client.BaseURL.ResolveReference(rel)
 
-// func (client *Client) NewRequest(method, urlString string, body interface{}) (*http.Request, error) {
-// 	rel, err := url.Parse(urlString)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	var buf io.ReadWriter
+	if body != nil {
+		buf = new(bytes.Buffer)
+		err := json.NewEncoder(buf).Encode(body)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-// 	url := client.BaseURL.ResolveReference(rel)
+	req, err := http.NewRequest(method, url.String(), buf)
+	if err != nil {
+		return nil, err
+	}
 
-// 	var buf io.ReadWriter
-// 	if body != nil {
-// 		buf = new(bytes.Buffer)
-// 		err := json.NewEncoder(buf).Encode(body)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
+	return req, nil
+}
 
-// 	req, err := http.NewRequest(method, url.String(), buf)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+func (cleint *Client) Do(req *http.Request) (*http.Response, error) {
+	resp, err := cleint.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
 
-// 	// req.Header.Add("Accept", "mediaType")
-// 	if client.UserAgent != "" {
-// 		req.Header.Add("User-Agent", client.UserAgent)
-// 	}
-// 	return req, nil
-// }
+	return resp, nil
+}
