@@ -1,70 +1,78 @@
 package goub
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
 	"net/http"
-	"net/url"
+
+	"golang.org/x/oauth2"
 )
 
 const (
-	goubVersion         = "0.1"
-	defaultBaseURL      = "http://coub.com"
-	userAgent           = "goub/" + goubVersion
-	authEndpoint        = "/oauth/authorize"
-	accessTokenParametr = "access_token"
+	goubVersion    = "0.1"
+	defaultBaseURL = "http://coub.com"
+	userAgent      = "goub/" + goubVersion
+	authEndpoint   = "/oauth/authorize"
+	authURL        = defaultBaseURL + "/oauth/authorize"
+	tokenURL       = defaultBaseURL + "/oauth/token"
 )
 
 type Client struct {
-	Client      *http.Client
-	BaseURL     *url.URL
-	UserAgent   string
-	AccessToken string
+	Client    *http.Client
+	UserAgent string
 }
 
-func NewClient(httpClient *http.Client, token string) *Client {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
+func MakeConfig(appId string, secret string, callbackURL string) *oauth2.Config {
+	return &oauth2.Config{
+		ClientID:     appId,
+		ClientSecret: secret,
+		RedirectURL:  callbackURL,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  authURL,
+			TokenURL: tokenURL,
+		},
 	}
+}
 
-	baseURL, _ := url.Parse(defaultBaseURL)
+func NewClient(config *oauth2.Config, code string) (*Client, error) {
+	token, err := config.Exchange(oauth2.NoContext, code)
+	if err != nil {
+		return nil, err
+	}
 
 	client := &Client{
-		Client:      httpClient,
-		BaseURL:     baseURL,
-		UserAgent:   userAgent,
-		AccessToken: token,
+		Client:    config.Client(oauth2.NoContext, token),
+		UserAgent: userAgent,
 	}
 
-	return client
+	return client, nil
 }
 
-func (client *Client) NewRequest(method, urlString string, body interface{}) (*http.Request, error) {
-	rel, err := url.Parse(urlString)
-	if err != nil {
-		return nil, err
-	}
+// func
 
-	url := client.BaseURL.ResolveReference(rel)
+// func (client *Client) NewRequest(method, urlString string, body interface{}) (*http.Request, error) {
+// 	rel, err := url.Parse(urlString)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	var buf io.ReadWriter
-	if body != nil {
-		buf = new(bytes.Buffer)
-		err := json.NewEncoder(buf).Encode(body)
-		if err != nil {
-			return nil, err
-		}
-	}
+// 	url := client.BaseURL.ResolveReference(rel)
 
-	req, err := http.NewRequest(method, url.String(), buf)
-	if err != nil {
-		return nil, err
-	}
+// 	var buf io.ReadWriter
+// 	if body != nil {
+// 		buf = new(bytes.Buffer)
+// 		err := json.NewEncoder(buf).Encode(body)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 	}
 
-	// req.Header.Add("Accept", "mediaType")
-	if client.UserAgent != "" {
-		req.Header.Add("User-Agent", client.UserAgent)
-	}
-	return req, nil
-}
+// 	req, err := http.NewRequest(method, url.String(), buf)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// req.Header.Add("Accept", "mediaType")
+// 	if client.UserAgent != "" {
+// 		req.Header.Add("User-Agent", client.UserAgent)
+// 	}
+// 	return req, nil
+// }
